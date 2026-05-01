@@ -36,7 +36,10 @@ Analysis Server:
 Compile the code:
 
 '''Bash
-g++ -std=c++17 localserver.cpp -o analysis_server -lpthread
+
+g++ -std=c++17 localserver.cpp -o analysis_server -lpthread  -lws2_32 -liphlpapi
+
+
 Run the application:
 
 Bash
