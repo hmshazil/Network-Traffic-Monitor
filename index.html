@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Network Traffic Monitor</title>
+    <style>
+        body { font-family: Arial; margin: 30px; background-color: #f0f2f5; }
+        .box { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #007bff; color: white; }
+        .stats-box { display: flex; gap: 20px; margin-bottom: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>Network Traffic Analysis Platform</h2>
+        
+        <div class="stats-box">
+            <div>Total Packets: <span id="totalP">0</span></div>
+            <div>Avg Size: <span id="avgS">0</span> bytes</div>
+        </div>
+
+        <div>
+            <button onclick="fetchData()">Start Monitoring</button>
+            <button onclick="location.reload()">Reset / Stop</button>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <select id="pFilter">
+                <option value="">All Protocols</option>
+                <option value="TCP">TCP</option>
+                <option value="UDP">UDP</option>
+                <option value="ICMP">ICMP</option>
+            </select>
+            <input type="text" id="sIP" placeholder="Source IP">
+            <button onclick="applyFilter()">Apply Filter</button>
+        </div>
+
+        <table id="pTable">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Source IP</th>
+                    <th>Destination IP</th>
+                    <th>Protocol</th>
+                    <th>Size</th>
+                    <th>Service</th>
+                </tr>
+            </thead>
+            <tbody id="tBody"></tbody>
+        </table>
+    </div>
+
+    <script>
+        let allData = [];
+
+        // Data ko backend se lane ka function
+        function fetchData() {
+            fetch('/api/packets')
+                .then(response => response.json())
+                .then(data => {
+                    allData = data;
+                    displayData(data);
+                })
+                .catch(err => console.error("Error fetching data:", err));
+        }
+
+        // Table aur Statistics update karne ka function
+        function displayData(data) {
+            const tbody = document.getElementById('tBody');
+            tbody.innerHTML = '';
+            let totalSize = 0;
+
+            data.forEach(p => {
+                totalSize += p.size;
+                tbody.innerHTML += `<tr>
+                    <td>${p.time}</td>
+                    <td>${p.src}</td>
+                    <td>${p.dest}</td>
+                    <td>${p.prot}</td>
+                    <td>${p.size} bytes</td>
+                    <td>${p.service}</td>
+                </tr>`;
+            });
+
+            document.getElementById('totalP').innerText = data.length;
+            document.getElementById('avgS').innerText = data.length > 0 ? (totalSize / data.length).toFixed(2) : 0;
+        }
+
+        // Filtering logic
+        function applyFilter() {
+            const prot = document.getElementById('pFilter').value;
+            const ip = document.getElementById('sIP').value;
+
+            const filtered = allData.filter(p => {
+                const matchesProt = (prot === "" || p.prot === prot);
+                const matchesIP = (ip === "" || p.src.includes(ip));
+                return matchesProt && matchesIP;
+            });
+
+            displayData(filtered);
+        }
+    </script>
+</body>
+</html>

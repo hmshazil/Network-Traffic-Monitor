@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Network Traffic Monitoring and Analysis Platform</title>
+    <style>
+        :root { 
+            --primary: #1a73e8; 
+            --tcp: #34a853; 
+            --udp: #fbbc04; 
+            --icmp: #ea4335; 
+            --bg: #f8f9fa; 
+            --text: #3c4043;
+        }
+        
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--text); }
+        .container { max-width: 1300px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+        
+        /* Header Section */
+        .header-section { border-bottom: 2px solid #eee; margin-bottom: 25px; padding-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        h1 { color: #202124; margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
+        .status-badge { padding: 5px 15px; border-radius: 20px; font-size: 12px; font-weight: bold; background: #e8eaed; }
+        .live-status { background: #fce8e6; color: #d93025; animation: blink 1.5s infinite; }
+
+        @keyframes blink { 50% { opacity: 0.5; } }
+
+        /* Dashboard Statistics Cards */
+        .stats-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .stat-card { background: white; padding: 20px; border-radius: 10px; border-top: 5px solid var(--primary); box-shadow: 0 2px 10px rgba(0,0,0,0.05); text-align: center; transition: 0.3s; }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .stat-card h4 { margin: 0; color: #5f6368; font-size: 12px; text-transform: uppercase; }
+        .stat-card div { font-size: 26px; font-weight: bold; margin-top: 10px; color: var(--primary); }
+        
+        /* Protocol Specific Colors */
+        .tcp-card { border-top-color: var(--tcp); }
+        .udp-card { border-top-color: var(--udp); }
+        .icmp-card { border-top-color: var(--icmp); }
+
+        /* Controls & Filters Area */
+        .controls { background: #f1f3f4; padding: 15px; border-radius: 10px; display: flex; gap: 15px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
+        input, select { padding: 10px; border: 1px solid #dadce0; border-radius: 6px; outline: none; font-size: 14px; }
+        input:focus { border-color: var(--primary); }
+        
+        button { padding: 10px 25px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        #startBtn { background: #34a853; color: white; }
+        #startBtn.stop { background: var(--danger); }
+        #resetBtn { background: #5f6368; color: white; }
+        button:hover { opacity: 0.9; }
+
+        /* Logs & Records Section */
+        .logs-section { border: 1px solid #dadce0; border-radius: 10px; overflow: hidden; background: white; }
+        .logs-header { background: #f1f3f4; padding: 12px 20px; font-weight: bold; border-bottom: 1px solid #dadce0; display: flex; justify-content: space-between; }
+        
+        .table-wrapper { max-height: 500px; overflow-y: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: var(--primary); color: white; padding: 15px; text-align: left; font-size: 13px; text-transform: uppercase; position: sticky; top: 0; }
+        td { padding: 12px 15px; border-bottom: 1px solid #eee; font-size: 14px; }
+        tr:hover { background: #f8f9fa; }
+
+        /* Styling Badges */
+        .port-badge { background: #e8f0fe; color: #1967d2; padding: 3px 8px; border-radius: 4px; font-family: 'Courier New', monospace; font-weight: bold; font-size: 12px; }
+        .service-tag { color: #188038; font-weight: bold; }
+        .high-load { background-color: #fce8e6; color: #d93025; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-section">
+        <h1>Network Traffic Monitoring and Analysis Platform</h1>
+        <div id="statusIndicator" class="status-badge">SYSTEM IDLE</div>
+    </div>
+    
+    <div class="stats-container">
+        <div class="stat-card">
+            <h4>Total Packets Logged</h4>
+            <div id="totalPackets">0</div>
+        </div>
+        <div class="stat-card tcp-card">
+            <h4>TCP Traffic</h4>
+            <div id="tcpCount" style="color: var(--tcp);">0</div>
+        </div>
+        <div class="stat-card udp-card">
+            <h4>UDP Traffic</h4>
+            <div id="udpCount" style="color: var(--udp);">0</div>
+        </div>
+        <div class="stat-card icmp-card">
+            <h4>ICMP Traffic</h4>
+            <div id="icmpCount" style="color: var(--icmp);">0</div>
+        </div>
+        <div class="stat-card" style="border-top-color: #70757a;">
+            <h4>Avg Payload (B)</h4>
+            <div id="avgSize">0.00</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="startBtn" onclick="toggleSniffing()">Start Monitoring</button>
+        <button id="resetBtn" onclick="resetApp()">Reset All Records</button>
+        
+        <div style="flex-grow: 1;"></div> <input type="text" id="ipSearch" placeholder="Filter by IP Address..." onkeyup="applyFilters()">
+        <select id="protocolFilter" onchange="applyFilters()">
+            <option value="All">All Protocols</option>
+            <option value="TCP">TCP</option>
+            <option value="UDP">UDP</option>
+            <option value="ICMP">ICMP</option>
+        </select>
+        <input type="text" id="serviceSearch" placeholder="Search Service..." onkeyup="applyFilters()">
+    </div>
+
+    <div class="logs-section">
+        <div class="logs-header">
+            <span>Live Traffic Records</span>
+            <span style="font-size: 12px; font-weight: normal; color: #5f6368;">Auto-saving to captured_packets.csv</span>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Source IP:Port</th>
+                        <th>Destination IP:Port</th>
+                        <th>Protocol</th>
+                        <th>Size (B)</th>
+                        <th>Service Mapping</th>
+                    </tr>
+                </thead>
+                <tbody id="tBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let isSniffing = false;
+    let snifferTimer;
+    let counts = { total: 0, TCP: 0, UDP: 0, ICMP: 0, totalSize: 0 };
+
+    function toggleSniffing() {
+        const btn = document.getElementById('startBtn');
+        const status = document.getElementById('statusIndicator');
+        isSniffing = !isSniffing;
+
+        if (isSniffing) {
+            btn.innerText = "Stop Capturing";
+            btn.classList.add('stop');
+            status.innerText = "• LIVE SCANNING";
+            status.classList.add('live-status');
+            snifferTimer = setInterval(fetchLivePacket, 2000);
+        } else {
+            btn.innerText = "Start Monitoring";
+            btn.classList.remove('stop');
+            status.innerText = "SYSTEM IDLE";
+            status.classList.remove('live-status');
+            clearInterval(snifferTimer);
+        }
+    }
+
+    function fetchLivePacket() {
+        fetch('/api/sniff')
+            .then(response => response.json())
+            .then(p => {
+                const tbody = document.getElementById('tBody');
+                const isHighLoad = p.size > 1000 ? 'class="high-load"' : '';
+
+                const row = `<tr ${isHighLoad}>
+                    <td>${p.time}</td>
+                    <td>${p.src}:<span class="port-badge">${p.srcPort}</span></td>
+                    <td>${p.dest}:<span class="port-badge">${p.destPort}</span></td>
+                    <td><strong>${p.prot}</strong></td>
+                    <td>${p.size}</td>
+                    <td class="service-tag">${p.service}</td>
+                </tr>`;
+
+                tbody.insertAdjacentHTML('afterbegin', row);
+
+                // Update Logic Counters
+                counts.total++;
+                counts[p.prot] = (counts[p.prot] || 0) + 1;
+                counts.totalSize += p.size;
+
+                // Update Dashboard UI
+                document.getElementById('totalPackets').innerText = counts.total;
+                document.getElementById('tcpCount').innerText = counts.TCP;
+                document.getElementById('udpCount').innerText = counts.UDP;
+                document.getElementById('icmpCount').innerText = counts.ICMP;
+                document.getElementById('avgSize').innerText = (counts.totalSize / counts.total).toFixed(2);
+
+                applyFilters(); // Keep current view filtered
+
+                if (tbody.children.length > 100) tbody.lastElementChild.remove();
+            });
+    }
+
+    function applyFilters() {
+        const protF = document.getElementById('protocolFilter').value.toUpperCase();
+        const ipF = document.getElementById('ipSearch').value.toLowerCase();
+        const servF = document.getElementById('serviceSearch').value.toLowerCase();
+        
+        const rows = document.querySelectorAll('#tBody tr');
+
+        rows.forEach(row => {
+            const rowText = row.innerText.toLowerCase();
+            const rowProt = row.cells[3].innerText.toUpperCase();
+            const rowServ = row.cells[5].innerText.toLowerCase();
+
+            const matches = (protF === "ALL" || rowProt.includes(protF)) &&
+                            rowText.includes(ipF) &&
+                            rowServ.includes(servF);
+
+            row.style.display = matches ? "" : "none";
+        });
+    }
+
+    function resetApp() {
+        if(confirm("Are you sure you want to clear all logs and the database file?")) {
+            fetch('/api/reset').then(() => {
+                location.reload();
+            });
+        }
+    }
+</script>
+
+</body>
+</html>
